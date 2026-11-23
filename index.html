@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guesstation — Personalized delivery estimate</title>
+<meta name="description" content="Guesstation estimates a personalized range of likely delivery dates from US birth records (CDC Natality 2023). Descriptive statistics, not medical advice.">
+<style>
+  :root {
+    --ink: #22302a;
+    --muted: #5c6b62;
+    --accent: #1d4d33;
+    --accent-soft: #dcefe6;
+    --card: #ffffff;
+    --page: #f4f6f3;
+    --line: #d9e0d9;
+    --warn-bg: #fdf3e3;
+    --warn-ink: #7a5410;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { text-align: center; margin: 8px 0 20px; }
+  header h1 { margin: 0; font-size: 2rem; letter-spacing: 0.01em; color: var(--accent); }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 1.05rem; }
+  section, .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  h3 { font-size: 1rem; margin: 0 0 10px; }
+  fieldset { border: 0; margin: 0 0 18px; padding: 0; }
+  fieldset:last-child { margin-bottom: 0; }
+  legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
+  .hint { color: var(--muted); font-size: 0.9rem; margin: 6px 0 0; }
+  .note { color: var(--muted); font-size: 0.92rem; margin: 10px 0 0; }
+  .caption { color: var(--muted); font-size: 0.95rem; margin: 0 0 12px; }
+
+  /* pill radios */
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pills label {
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px;
+    cursor: pointer; font-size: 0.95rem; background: #fff; user-select: none;
+  }
+  .pills input { position: absolute; opacity: 0; pointer-events: none; }
+  .pills input:checked + span { font-weight: 700; }
+  .pills label:has(input:checked) {
+    background: var(--accent-soft); border-color: var(--accent); color: var(--accent);
+  }
+  .pills label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  input[type="date"], input[type="number"], select {
+    font: inherit; padding: 9px 10px; border: 1px solid var(--line);
+    border-radius: 10px; background: #fff; color: var(--ink); max-width: 100%;
+  }
+  input[type="date"] { width: 100%; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .row > div { flex: 1 1 120px; }
+  .row label, .field-label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .checks { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .checks label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; font-size: 0.97rem; }
+  .checks input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); flex: none; }
+
+  /* results */
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .kv:last-child { border-bottom: 0; }
+  .kv span { color: var(--muted); }
+  .kv strong { text-align: right; }
+  .kv.big strong { font-size: 1.3rem; color: var(--accent); }
+  .ga-line { font-weight: 600; margin: 12px 0 0; }
+  .muted { color: var(--muted); }
+  .warn { background: var(--warn-bg); border-color: #ecd9ac; }
+  .warn p { color: var(--warn-ink); }
+  .btn {
+    font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 10px;
+    background: var(--accent); color: #fff; padding: 10px 18px;
+  }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .edd-line { color: var(--muted); font-size: 0.92rem; margin: 4px 2px 0; }
+  .chart-note { color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
+  svg { display: block; width: 100%; height: auto; }
+
+  /* term breakdown bars */
+  .term-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .term-label { flex: 0 0 46%; font-size: 0.92rem; }
+  .term-track { flex: 1; height: 12px; background: #edf1ed; border-radius: 999px; overflow: hidden; }
+  .term-fill { height: 100%; border-radius: 999px; }
+  .term-fill.pre { background: #c98a2e; }
+  .term-fill.tm { background: #5b8a72; }
+  .term-fill.post { background: #7a9cc6; }
+  .term-val { flex: 0 0 52px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  footer { color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 8px; }
+  footer p { margin: 6px 0; }
+  .reset-wrap { text-align: center; margin: 4px 0 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Guesstation</h1>
+    <p>Personalized delivery estimate</p>
+  </header>
+
+  <form id="profileForm" autocomplete="off">
+    <section aria-labelledby="dates-h">
+      <h2 id="dates-h">Your dates</h2>
+      <fieldset>
+        <legend>I know my…</legend>
+        <div class="pills" role="group" aria-label="Date mode">
+          <label><input type="radio" name="dateMode" value="edd" checked><span>Due date</span></label>
+          <label><input type="radio" name="dateMode" value="lmp"><span>Last period</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <label class="field-label" for="refDate">Date</label>
+        <input type="date" id="refDate" name="refDate">
+        <p class="hint" id="dateHint"></p>
+      </fieldset>
+    </section>
+
+    <section aria-labelledby="about-h">
+      <h2 id="about-h">About this pregnancy</h2>
+
+      <fieldset>
+        <legend>Your age</legend>
+        <div class="pills" role="group" aria-label="Age band">
+          <label><input type="radio" name="ageBand" value="under20"><span>Under 20</span></label>
+          <label><input type="radio" name="ageBand" value="20to24"><span>20–24</span></label>
+          <label><input type="radio" name="ageBand" value="25to34" checked><span>25–34</span></label>
+          <label><input type="radio" name="ageBand" value="35to39"><span>35–39</span></label>
+          <label><input type="radio" name="ageBand" value="40plus"><span>40+</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Body mass index (BMI)</legend>
+        <div class="row">
+          <div>
+            <label for="heightVal">Height</label>
+            <input type="number" id="heightVal" inputmode="decimal" min="0" step="any" placeholder="e.g. 165">
+          </div>
+          <div>
+            <label for="heightUnit">Units</label>
+            <select id="heightUnit"><option value="cm">cm</option><option value="in">inches</option></select>
+          </div>
+          <div>
+            <label for="weightVal">Pre-pregnancy weight</label>
+            <input type="number" id="weightVal" inputmode="decimal" min="0" step="any" placeholder="e.g. 65">
+          </div>
+          <div>
+            <label for="weightUnit">Units</label>
+            <select id="weightUnit"><option value="kg">kg</option><option value="lb">lb</option></select>
+          </div>
+        </div>
+        <p class="hint">Or set BMI directly:</p>
+        <input type="range" id="bmiSlider" min="15" max="45" step="0.1" value="22" aria-label="BMI">
+        <p class="hint" id="bmiReadout">BMI not entered — using average</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>How many babies?</legend>
+        <div class="pills" role="group" aria-label="Plurality">
+          <label><input type="radio" name="plurality" value="singleton" checked><span>One</span></label>
+          <label><input type="radio" name="plurality" value="twins"><span>Twins</span></label>
+          <label><input type="radio" name="plurality" value="tripletPlus"><span>Triplets or more</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Is this your first baby?</legend>
+        <div class="pills" role="group" aria-label="First birth">
+          <label><input type="radio" name="firstBirth" value="yes"><span>Yes</span></label>
+          <label><input type="radio" name="firstBirth" value="no" checked><span>No</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Baby's sex</legend>
+        <div class="pills" role="group" aria-label="Baby's sex">
+          <label><input type="radio" name="sex" value="female" checked><span>Girl</span></label>
+          <label><input type="radio" name="sex" value="male"><span>Boy</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Do you smoke?</legend>
+        <div class="pills" role="group" aria-label="Smoking">
+          <label><input type="radio" name="smoking" value="no" checked><span>No</span></label>
+          <label><input type="radio" name="smoking" value="yes"><span>Yes</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Any of these apply?</legend>
+        <div class="checks">
+          <label><input type="checkbox" id="cChronicHTN"> Chronic high blood pressure (before pregnancy)</label>
+          <label><input type="checkbox" id="cPregHTN"> High blood pressure in this pregnancy</label>
+          <label><input type="checkbox" id="cPreDiab"> Diabetes before pregnancy</label>
+          <label><input type="checkbox" id="cGestDiab"> Gestational diabetes</label>
+          <label><input type="checkbox" id="cPrevPreterm"> Previous preterm birth</label>
+          <label><input type="checkbox" id="cFertilityTx"> Fertility treatment for this pregnancy</label>
+          <label><input type="checkbox" id="cLatePrenatal"> Prenatal care started late</label>
+          <label><input type="checkbox" id="cPrevCesarean"> Previous cesarean</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Race / ethnicity</legend>
+        <select id="raceSel" aria-label="Race or ethnicity">
+          <option value="white" selected>White</option>
+          <option value="black">Black</option>
+          <option value="hispanic">Hispanic</option>
+          <option value="asian">Asian</option>
+          <option value="aian">American Indian or Alaska Native</option>
+          <option value="other">Other</option>
+        </select>
+        <p class="hint">Used only because birth timing differs across groups in the records the model is built from.</p>
+      </fieldset>
+    </section>
+
+    <section aria-labelledby="view-h">
+      <h2 id="view-h">What would you like to see?</h2>
+      <div class="pills" role="group" aria-label="Scenario">
+        <label><input type="radio" name="scenario" value="spont" checked><span>If you wait</span></label>
+        <label><input type="radio" name="scenario" value="all"><span>All deliveries</span></label>
+      </div>
+      <p class="hint" id="scenarioNote"></p>
+    </section>
+  </form>
+
+  <div class="reset-wrap">
+    <button type="button" class="btn ghost" id="resetBtn">Start over</button>
+  </div>
+
+  <div id="results" aria-live="polite">
+    <div class="card muted"><p>Enter your due date or last period above to see your personalized estimate.</p></div>
+  </div>
+
+  <footer>
+    <p>Based on US live-birth records (CDC Natality 2023, n=514,352). Descriptive statistics, not medical advice.</p>
+    <p>Guesstation estimates a delivery-date range from population data. It is not a medical device and does not replace your care provider's advice. Your answers stay in this browser.</p>
+    <p><a href="https://apps.apple.com/us/app/guesstation/id6826026956">Get the iOS app</a></p>
+  </footer>
+</main>
+<script src="app.js"></script>
+<script>
+  // Reset button: clear the saved profile and reload with defaults.
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    try { localStorage.removeItem('guesstation-web-profile-v1'); } catch (e) {}
+    location.reload();
+  });
+</script>
+</body>
+</html>
